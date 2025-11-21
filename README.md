@@ -8,7 +8,7 @@ Hệ thống phát hiện và phân loại món ăn sử dụng YOLOE và Mobile
 **✨ Tính năng:**
 - 🎯 **Smart Detection**: Ensemble filtering (spatial, size, ML) loại bỏ background & duplicates
 - 🔍 **High Accuracy**: MobileCLIP 512-dim embeddings với cosine similarity
-- ⚡ **Fast**: ~2s/image, hỗ trợ batch processing
+- ⚡ **Fast**: ~1s/image, hỗ trợ batch processing
 - 🌐 **REST API**: FastAPI integration cho microservices
 - 🎨 **Beautiful Viz**: Consistent colors cho từng class
 
@@ -19,9 +19,6 @@ Hệ thống phát hiện và phân loại món ăn sử dụng YOLOE và Mobile
 ### 1️⃣ Cài Đặt
 
 ```powershell
-# Clone repo
-git clone https://github.com/thiennvu1914/ObjectDetection.git
-cd ObjectDetection
 
 # Tạo virtual environment (Python 3.11+)
 python -m venv .venv11
@@ -33,7 +30,7 @@ pip install -r requirements.txt
 
 ### 2️⃣ Tải Models
 
-Models không có trong repo, cần tải riêng:
+Models cần tải riêng:
 
 ```powershell
 # YOLOE (70.8MB) - từ Ultralytics
@@ -97,9 +94,9 @@ ObjectDetection/
 ├── run_api.py                     # API server entry point
 ├── example_client.py              # Python API client example
 │
-├── models/                        # ⚠️ NOT in git - download separately
-│   ├── yoloe-11l-seg-pf.pt       # YOLOE detection model (70.8MB)
-│   └── mobileclip_s2/            # MobileCLIP model (380MB)
+├── models/                      
+│   ├── yoloe-11l-seg-pf.pt       # YOLOE detection model (~70.8MB)
+│   └── mobileclip_s2/            # MobileCLIP model (~380MB)
 │
 ├── data/
 │   ├── images/                   # Input images
@@ -141,8 +138,8 @@ ObjectDetection/
 python main.py data/images/image_01.jpg
 
 # Custom confidence threshold
-python main.py data/images/image_01.jpg --conf 0.3   # Detect more
-python main.py data/images/image_01.jpg --conf 0.7   # Only confident
+python main.py data/images/image_01.jpg --conf 0.3  
+python main.py data/images/image_01.jpg --conf 0.7
 
 # Custom output
 python main.py data/images/image_01.jpg --output results/my_result.jpg
@@ -402,22 +399,7 @@ Pull requests welcome!
 
 ---
 
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file
-
----
-
 ## 🙏 Credits
 
 - **YOLOE**: [Ultralytics](https://github.com/ultralytics/ultralytics)
 - **MobileCLIP**: [Apple ML Research](https://github.com/apple/ml-mobileclip)
-
----
-
-## 📞 Contact
-
-- Author: **thiennvu1914**
-- GitHub: [@thiennvu1914](https://github.com/thiennvu1914)
-
-**⭐ If this project helps you, give it a star!**

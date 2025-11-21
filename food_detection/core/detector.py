@@ -25,6 +25,50 @@ class YOLOEFoodDetector:
         self.model = YOLOE(model_path)
         print("✓ Model loaded")
     
+    def detect(self, image_path, conf=0.5, filter_method="ensemble"):
+        """
+        Detect food items with smart filtering.
+        
+        Args:
+            image_path: Path to image
+            conf: Confidence threshold (default: 0.5)
+            filter_method: 'ensemble', 'spatial', 'size', 'ml', or 'none'
+        
+        Returns:
+            List of detection dicts with 'bbox', 'label', 'score'
+        """
+        # Get raw predictions
+        result = self.predict(image_path, conf=conf)
+        
+        # Apply filtering (returns list of box objects)
+        if filter_method == "ensemble":
+            filtered_boxes = self.ensemble_filter(result)
+        elif filter_method == "spatial":
+            filtered_boxes = self.spatial_filter(result)
+        elif filter_method == "size":
+            filtered_boxes = self.size_filter(result)
+        elif filter_method == "ml":
+            filtered_boxes = self.ml_filter(result)
+        else:
+            # No filtering
+            filtered_boxes = list(result.boxes) if result.boxes is not None else []
+        
+        # Convert box objects to dicts
+        detections = []
+        for box in filtered_boxes:
+            xyxy = box.xyxy[0].cpu().numpy()
+            conf = box.conf[0].cpu().item()
+            cls_id = int(box.cls[0].cpu().item())
+            label = self.model.names[cls_id]
+            
+            detections.append({
+                'bbox': xyxy.tolist(),
+                'label': label,
+                'score': float(conf)
+            })
+        
+        return detections
+    
     def predict(self, image_path, conf=0.25, iou=0.5):
         """Run YOLOE prediction"""
         results = self.model.predict(image_path, conf=conf, iou=iou, verbose=False)
@@ -452,11 +496,8 @@ class YOLOEFoodDetector:
         ml_boxes = self.ml_filter_no_container(result)
         
         print(f"  - Spatial: {len(spatial_boxes)} items")
-        print(f"    → {[self.model.names[int(b.cls[0].item())] for b in spatial_boxes]}")
         print(f"  - Size: {len(size_boxes)} items")
-        print(f"    → {[self.model.names[int(b.cls[0].item())] for b in size_boxes]}")
         print(f"  - ML: {len(ml_boxes)} items")
-        print(f"    → {[self.model.names[int(b.cls[0].item())] for b in ml_boxes]}")
         
         # Convert to sets of indices (use array index instead of id)
         spatial_indices = set()

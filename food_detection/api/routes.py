@@ -49,8 +49,15 @@ async def detect_food(
         - classes: List of detected class names
     """
     # Validate file type
-    if not file.content_type.startswith("image/"):
+    if file.content_type and not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Additional validation: check file extension if content_type is None
+    if not file.content_type:
+        allowed_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
+        file_ext = Path(file.filename).suffix.lower()
+        if file_ext not in allowed_extensions:
+            raise HTTPException(status_code=400, detail=f"File must be an image. Allowed: {allowed_extensions}")
     
     # Save uploaded file to temporary location
     with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp:
@@ -130,7 +137,17 @@ async def detect_food_batch(
     pipeline = get_pipeline()
     
     for file in files:
-        if not file.content_type.startswith("image/"):
+        # Validate file type
+        is_valid = False
+        if file.content_type:
+            is_valid = file.content_type.startswith("image/")
+        else:
+            # Fallback to extension check
+            allowed_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
+            file_ext = Path(file.filename).suffix.lower()
+            is_valid = file_ext in allowed_extensions
+        
+        if not is_valid:
             results.append({
                 "filename": file.filename,
                 "success": False,

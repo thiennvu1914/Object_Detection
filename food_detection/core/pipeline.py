@@ -85,31 +85,26 @@ class FoodDetectionPipeline:
         """
         start_time = time.time()
         
-        # 1. Detect objects
-        results = self.detector.detect(image_path, conf=conf)
-        boxes = results.boxes
+        # 1. Detect objects (returns list of dicts with ensemble filtering)
+        detections = self.detector.detect(image_path, conf=conf, filter_method="ensemble")
         
-        # 2. Filter detections
-        boxes = self.detector.remove_large_boxes(boxes, results.orig_img.shape)
-        boxes = self.detector.filter_containers(boxes)
-        boxes = self.detector.remove_overlaps(boxes)
+        # Read image for cropping
+        image = cv2.imread(image_path)
         
-        if len(boxes) == 0:
+        if len(detections) == 0:
             return {
                 'detections': [],
-                'image_shape': results.orig_img.shape,
+                'image_shape': image.shape,
                 'processing_time': time.time() - start_time,
                 'crops': []
             }
         
-        # 3. Crop detected regions
-        image = cv2.imread(image_path)
+        # 2. Crop detected regions and generate embeddings
         crops = []
-        crop_files = []
+        embeddings = []
         
-        for i, box in enumerate(boxes):
-            coords = box.xyxy[0].cpu().numpy().astype(int)
-            x1, y1, x2, y2 = coords
+        for det in detections:
+            x1, y1, x2, y2 = [int(c) for c in det['bbox']]
             
             # Add padding
             padding = 5
@@ -119,38 +114,38 @@ class FoodDetectionPipeline:
             y2 = min(image.shape[0], y2 + padding)
             
             crop = image[y1:y2, x1:x2]
+            crops.append(crop)
             
-            # Save temporary crop
-            temp_path = f"/tmp/crop_{i}.jpg"
-            cv2.imwrite(temp_path, crop)
-            crop_files.append(temp_path)
-            
-            if return_crops:
-                crops.append(crop)
+            # Generate embedding (embed() takes BGR image array)
+            embedding = self.embedder.embed(crop)
+            embeddings.append(embedding)
         
-        # 4. Generate embeddings
-        embeddings = self.embedder.encode_images_batch(crop_files)
+        # 3. Classify using embeddings
+        classifications = self.classifier.classify_batch(np.array(embeddings))
         
-        # 5. Classify
-        classifications = self.classifier.classify_batch(embeddings)
-        
-        # 6. Build results
-        detections = []
-        for i, (box, (class_name, similarity)) in enumerate(zip(boxes, classifications)):
-            coords = box.xyxy[0].cpu().numpy()
-            det_conf = float(box.conf[0].cpu().numpy())
-            
-            detections.append({
-                'bbox': coords.tolist(),
+        # 4. Update detections with classification results
+        final_detections = []
+        for i, (det, (class_name, similarity)) in enumerate(zip(detections, classifications)):
+            final_detections.append({
+                'bbox': det['bbox'],
                 'class': class_name,
-                'similarity': similarity,
-                'confidence': det_conf,
+                'similarity': float(similarity),
+                'confidence': float(det['score']),
                 'index': i
             })
         
+        # 5. Print classification summary
+        from collections import Counter
+        class_counts = Counter([det['class'] for det in final_detections])
+        print(f"\n📦 CLASSIFICATION RESULTS:")
+        print(f"   Detected {len(final_detections)} food items:")
+        for class_name, count in sorted(class_counts.items()):
+            print(f"      • {count}x {class_name}")
+        print()
+        
         result = {
-            'detections': detections,
-            'image_shape': results.orig_img.shape,
+            'detections': final_detections,
+            'image_shape': image.shape,
             'processing_time': time.time() - start_time
         }
         

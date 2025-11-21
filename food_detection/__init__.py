@@ -5,7 +5,7 @@ A modular package for detecting and classifying food items using YOLOE and Mobil
 """
 
 __version__ = "1.0.0"
-__author__ = "thiennvu1914"
+__author__ = "vuhnt"
 
 from .core.pipeline import FoodDetectionPipeline
 from .core.detector import YOLOEFoodDetector

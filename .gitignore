@@ -89,8 +89,15 @@ data/yolov11_dataset/
 !data/DATA_STRUCTURE.md
 
 # ==============================================================================
-# Embedding Database
+# SQLite Database
 # ==============================================================================
+# Exclude SQLite database file (contains cached embeddings and detection history)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Legacy embedding database (no longer used)
 db/vectors.npy
 db/labels.txt
 !db/.gitkeep

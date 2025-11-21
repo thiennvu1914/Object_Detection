@@ -1,28 +1,73 @@
 """
-YOLOE Smart Filtering - No Keywords Required!
-==============================================
-Tự động detect food items trong khay bằng ML, không cần list classes
+YOLOE Food Detector Module
+===========================
+Smart filtering for food detection with ensemble methods.
 
-4 Phương pháp:
-1. SPATIAL FILTERING - Tìm vùng food region
-2. SIZE-BASED FILTERING - Clustering theo size
-3. ML CLASSIFIER - Score dựa trên features
-4. ENSEMBLE - Voting từ 3 methods
+4 Filtering Methods:
+1. SPATIAL FILTERING - Find food region clusters
+2. SIZE-BASED FILTERING - Remove size outliers
+3. ML CLASSIFIER - Score based on features
+4. ENSEMBLE - Voting from 3 methods (RECOMMENDED)
 """
 from ultralytics import YOLOE
 import cv2
 import numpy as np
 from pathlib import Path
-import sys
 import torch
+from typing import List, Optional
 
-class YOLOEFoodFilter:
+
+class YOLOEFoodDetector:
     """Smart filtering for food items - no keywords needed"""
     
     def __init__(self, model_path="models/yoloe-11l-seg-pf.pt"):
         print("Loading YOLOE model...")
         self.model = YOLOE(model_path)
         print("✓ Model loaded")
+    
+    def detect(self, image_path, conf=0.5, filter_method="ensemble"):
+        """
+        Detect food items with smart filtering.
+        
+        Args:
+            image_path: Path to image
+            conf: Confidence threshold (default: 0.5)
+            filter_method: 'ensemble', 'spatial', 'size', 'ml', or 'none'
+        
+        Returns:
+            List of detection dicts with 'bbox', 'label', 'score'
+        """
+        # Get raw predictions
+        result = self.predict(image_path, conf=conf)
+        
+        # Apply filtering (returns list of box objects)
+        if filter_method == "ensemble":
+            filtered_boxes = self.ensemble_filter(result)
+        elif filter_method == "spatial":
+            filtered_boxes = self.spatial_filter(result)
+        elif filter_method == "size":
+            filtered_boxes = self.size_filter(result)
+        elif filter_method == "ml":
+            filtered_boxes = self.ml_filter(result)
+        else:
+            # No filtering
+            filtered_boxes = list(result.boxes) if result.boxes is not None else []
+        
+        # Convert box objects to dicts
+        detections = []
+        for box in filtered_boxes:
+            xyxy = box.xyxy[0].cpu().numpy()
+            conf = box.conf[0].cpu().item()
+            cls_id = int(box.cls[0].cpu().item())
+            label = self.model.names[cls_id]
+            
+            detections.append({
+                'bbox': xyxy.tolist(),
+                'label': label,
+                'score': float(conf)
+            })
+        
+        return detections
     
     def predict(self, image_path, conf=0.25, iou=0.5):
         """Run YOLOE prediction"""
@@ -268,7 +313,7 @@ class YOLOEFoodFilter:
         """
         initial_count = len(boxes)
         
-        print(f"\n  🔧 Post-processing: {initial_count} boxes")
+        print(f"\n  Post-processing: {initial_count} boxes")
         
         # Step 0: Remove too-large boxes first
         boxes = self.remove_too_large_boxes(boxes, threshold=0.7)
@@ -283,7 +328,7 @@ class YOLOEFoodFilter:
         boxes = self.normalize_conf_area(boxes)
         
         final_count = len(boxes)
-        print(f"  ✓ Final: {final_count} food items ({initial_count - final_count} removed)\n")
+        print(f"  Final: {final_count} food items ({initial_count - final_count} removed)\n")
         
         return boxes
     
@@ -442,7 +487,7 @@ class YOLOEFoodFilter:
         if len(boxes) == 0:
             return []
         
-        print(f"\n🔄 Running 3 filtering methods...")
+        print(f"\nRunning 3 filtering methods...")
         
         # Get results from 3 methods WITHOUT post-processing
         # (chỉ remove inner + outliers, KHÔNG remove container)
@@ -451,11 +496,8 @@ class YOLOEFoodFilter:
         ml_boxes = self.ml_filter_no_container(result)
         
         print(f"  - Spatial: {len(spatial_boxes)} items")
-        print(f"    → {[self.model.names[int(b.cls[0].item())] for b in spatial_boxes]}")
         print(f"  - Size: {len(size_boxes)} items")
-        print(f"    → {[self.model.names[int(b.cls[0].item())] for b in size_boxes]}")
         print(f"  - ML: {len(ml_boxes)} items")
-        print(f"    → {[self.model.names[int(b.cls[0].item())] for b in ml_boxes]}")
         
         # Convert to sets of indices (use array index instead of id)
         spatial_indices = set()
@@ -492,7 +534,7 @@ class YOLOEFoodFilter:
         food_boxes = self.remove_container(food_boxes)
         food_boxes = self.remove_inner(food_boxes)
         
-        print(f"  ✓ Final result: {len(food_boxes)} food items\n")
+        print(f"  Final result: {len(food_boxes)} food items\n")
         
         return food_boxes
     
@@ -668,6 +710,7 @@ class YOLOEFoodFilter:
 
 def main():
     """CLI interface"""
+    import sys
     if len(sys.argv) < 3:
         print("""
 YOLOE Smart Filtering - No Keywords!
@@ -696,8 +739,8 @@ Examples:
         print(f"❌ Image not found: {image_path}")
         return
     
-    # Initialize filter
-    filter = YOLOEFoodFilter()
+    # Initialize detector
+    filter = YOLOEFoodDetector()
     
     if method == "compare":
         filter.compare_all(image_path)

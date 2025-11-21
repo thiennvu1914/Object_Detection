@@ -59,6 +59,9 @@ async def detect_food(
         if file_ext not in allowed_extensions:
             raise HTTPException(status_code=400, detail=f"File must be an image. Allowed: {allowed_extensions}")
     
+    # Log input
+    print(f"\n[API] INPUT: image={file.filename}, confidence={confidence}")
+    
     # Save uploaded file to temporary location
     with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp:
         shutil.copyfileobj(file.file, tmp)
@@ -72,6 +75,12 @@ async def detect_food(
         # Extract class names
         classes = [det['class'] for det in results['detections']]
         
+        # Log output
+        if len(results['detections']) > 0:
+            print(f"[API] OUTPUT: status=OK (detected {len(results['detections'])} items: {classes})")
+        else:
+            print(f"[API] OUTPUT: status=FAILED (no items detected)")
+        
         return JSONResponse(content={
             "success": True,
             "data": {
@@ -84,6 +93,7 @@ async def detect_food(
         })
         
     except Exception as e:
+        print(f"[API] OUTPUT: status=FAILED (error: {str(e)})")
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
     
     finally:
@@ -132,6 +142,10 @@ async def detect_food_batch(
     """
     if len(files) > 10:
         raise HTTPException(status_code=400, detail="Maximum 10 images per batch")
+    
+    # Log input
+    file_names = [f.filename for f in files]
+    print(f"\n[API] INPUT: batch_size={len(files)}, images={file_names}, confidence={confidence}")
     
     results = []
     pipeline = get_pipeline()
@@ -183,6 +197,19 @@ async def detect_food_batch(
         
         finally:
             Path(tmp_path).unlink(missing_ok=True)
+    
+    # Log output
+    successful = sum(1 for r in results if r.get("success", False))
+    statuses = []
+    for r in results:
+        if r.get("success") and r.get("count", 0) > 0:
+            statuses.append(f"{r['filename']}=OK")
+        else:
+            statuses.append(f"{r['filename']}=FAILED")
+    
+    overall_status = "OK" if successful == len(files) and all("=OK" in s for s in statuses) else "FAILED"
+    print(f"[API] OUTPUT: overall_status={overall_status}, successful={successful}/{len(files)}")
+    print(f"[API]    Details: {', '.join(statuses)}")
     
     return JSONResponse(content={
         "success": True,

@@ -32,6 +32,8 @@ class FoodDetectionClient:
         Returns:
             API response dict with detection results
         """
+        print(f"\nINPUT: image={Path(image_path).name}")
+        
         with open(image_path, 'rb') as f:
             response = requests.post(
                 f"{self.api_base}/detect",
@@ -39,7 +41,18 @@ class FoodDetectionClient:
                 params={'confidence': confidence}
             )
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        
+        # Check if any items detected
+        if result.get('success') and result['data'].get('count', 0) > 0:
+            status = "OK"
+            detected_classes = result['data'].get('classes', [])
+            print(f"OUTPUT: status={status} (detected={detected_classes})")
+        else:
+            status = "FAILED"
+            print(f"OUTPUT: status={status} (no items detected)")
+        
+        return result
     
     def detect_batch(self, image_paths: list, confidence: float = 0.5) -> dict:
         """
@@ -55,6 +68,10 @@ class FoodDetectionClient:
         if len(image_paths) > 10:
             raise ValueError("Maximum 10 images per batch")
         
+        # Log input
+        image_names = [Path(p).name for p in image_paths]
+        print(f"\nINPUT: images={image_names}")
+        
         files = [('files', open(path, 'rb')) for path in image_paths]
         try:
             response = requests.post(
@@ -63,7 +80,24 @@ class FoodDetectionClient:
                 params={'confidence': confidence}
             )
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            
+            # Check results
+            if result.get('success'):
+                statuses = []
+                for i, img_result in enumerate(result['data']['results']):
+                    if img_result.get('success') and img_result.get('count', 0) > 0:
+                        statuses.append(f"{image_names[i]}=OK")
+                    else:
+                        statuses.append(f"{image_names[i]}=FAILED")
+                
+                overall_status = "OK" if all("=OK" in s for s in statuses) else "FAILED"
+                print(f"OUTPUT: overall_status={overall_status}")
+                print(f"   Details: {', '.join(statuses)}")
+            else:
+                print(f"OUTPUT: status=FAILED")
+            
+            return result
         finally:
             for _, f in files:
                 f.close()

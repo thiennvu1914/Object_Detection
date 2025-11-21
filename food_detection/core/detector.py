@@ -313,7 +313,7 @@ class YOLOEFoodDetector:
         """
         initial_count = len(boxes)
         
-        print(f"\n  🔧 Post-processing: {initial_count} boxes")
+        print(f"\n  Post-processing: {initial_count} boxes")
         
         # Step 0: Remove too-large boxes first
         boxes = self.remove_too_large_boxes(boxes, threshold=0.7)
@@ -328,7 +328,7 @@ class YOLOEFoodDetector:
         boxes = self.normalize_conf_area(boxes)
         
         final_count = len(boxes)
-        print(f"  ✓ Final: {final_count} food items ({initial_count - final_count} removed)\n")
+        print(f"  Final: {final_count} food items ({initial_count - final_count} removed)\n")
         
         return boxes
     
@@ -487,7 +487,7 @@ class YOLOEFoodDetector:
         if len(boxes) == 0:
             return []
         
-        print(f"\n🔄 Running 3 filtering methods...")
+        print(f"\nRunning 3 filtering methods...")
         
         # Get results from 3 methods WITHOUT post-processing
         # (chỉ remove inner + outliers, KHÔNG remove container)
@@ -534,7 +534,7 @@ class YOLOEFoodDetector:
         food_boxes = self.remove_container(food_boxes)
         food_boxes = self.remove_inner(food_boxes)
         
-        print(f"  ✓ Final result: {len(food_boxes)} food items\n")
+        print(f"  Final result: {len(food_boxes)} food items\n")
         
         return food_boxes
     

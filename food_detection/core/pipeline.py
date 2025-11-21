@@ -137,10 +137,10 @@ class FoodDetectionPipeline:
         # 5. Print classification summary
         from collections import Counter
         class_counts = Counter([det['class'] for det in final_detections])
-        print(f"\n📦 CLASSIFICATION RESULTS:")
+        print(f"\nCLASSIFICATION RESULTS:")
         print(f"   Detected {len(final_detections)} food items:")
         for class_name, count in sorted(class_counts.items()):
-            print(f"      • {count}x {class_name}")
+            print(f"      {count}x {class_name}")
         print()
         
         result = {

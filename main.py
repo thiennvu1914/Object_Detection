@@ -19,12 +19,11 @@ import torch
 # Add directories to path
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
-sys.path.insert(0, str(current_dir / "src"))
 
-# Import modules
-from yoloe_food import YOLOEFoodFilter
-from embed import MobileCLIP2Embedder
-from visualize import visualize_detections
+# Import from food_detection package
+from food_detection.core.detector import YOLOEFoodDetector
+from food_detection.core.embedder import MobileCLIPEmbedder  
+from food_detection.utils.visualize import visualize_detections, get_class_color
 
 
 class FoodDetectionPipeline:
@@ -38,12 +37,12 @@ class FoodDetectionPipeline:
         # Load models
         print("\n[1/3] Loading YOLOE detector...")
         t0 = time.time()
-        self.detector = YOLOEFoodFilter()
+        self.detector = YOLOEFoodDetector()
         print(f"      ✓ YOLOE loaded in {time.time()-t0:.2f}s")
         
         print("\n[2/3] Loading MobileCLIP embedder...")
         t0 = time.time()
-        self.embedder = MobileCLIP2Embedder()
+        self.embedder = MobileCLIPEmbedder()
         print(f"      ✓ MobileCLIP loaded in {time.time()-t0:.2f}s")
         
         print("\n[3/3] Loading reference embeddings...")
@@ -57,7 +56,7 @@ class FoodDetectionPipeline:
             print(f"      → Classes: {', '.join(sorted(classes))}")
             
             # Import để có thể kiểm tra màu
-            from visualize import get_class_color
+            from food_detection.utils.visualize import get_class_color
             for cls in sorted(classes):
                 color = get_class_color(cls)
                 print(f"         • {cls}: RGB{color[::-1]}")

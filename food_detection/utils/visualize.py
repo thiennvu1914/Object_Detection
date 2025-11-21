@@ -48,29 +48,48 @@ def visualize_detections(
     image: np.ndarray,
     detections: List[Dict],
     show_confidence: bool = True,
-    thickness: int = 2
+    thickness: int = 2,
+    use_class_colors: bool = True,
+    random_colors: bool = False
 ) -> np.ndarray:
     """
     Draw detection results on image.
     
     Args:
         image: Input image (BGR)
-        detections: List of detection dicts with bbox, class, similarity
+        detections: List of detection dicts with bbox, class/label, similarity/score
         show_confidence: Whether to show confidence scores
         thickness: Line thickness for bounding boxes
+        use_class_colors: Use consistent colors for classes (default: True)
+        random_colors: Use random colors (overrides use_class_colors)
         
     Returns:
         Image with drawn detections
     """
     result = image.copy()
     
-    for det in detections:
+    # Generate random colors if requested
+    if random_colors:
+        np.random.seed(42)
+        colors = [(int(np.random.randint(0, 255)), 
+                   int(np.random.randint(0, 255)), 
+                   int(np.random.randint(0, 255))) 
+                  for _ in range(len(detections))]
+    
+    for idx, det in enumerate(detections):
         bbox = det['bbox']
-        class_name = det['class']
-        similarity = det.get('similarity', 0.0)
+        # Support both 'class' and 'label' field names
+        class_name = det.get('class') or det.get('label', 'unknown')
+        # Support both 'similarity' and 'score' field names
+        confidence = det.get('similarity') or det.get('score', 0.0)
         
-        # Get color for class
-        color = get_class_color(class_name)
+        # Get color
+        if random_colors:
+            color = colors[idx]
+        elif use_class_colors:
+            color = get_class_color(class_name)
+        else:
+            color = (0, 255, 0)  # Default green
         
         # Draw bounding box
         x1, y1, x2, y2 = [int(c) for c in bbox]
@@ -78,7 +97,7 @@ def visualize_detections(
         
         # Prepare label
         if show_confidence:
-            label = f"{class_name} ({similarity:.2f})"
+            label = f"{class_name} ({confidence:.2f})"
         else:
             label = class_name
         

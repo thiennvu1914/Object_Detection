@@ -35,6 +35,29 @@ class MobileCLIPEmbedder:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = self.model.to(self.device)
     
+    def embed(self, img_bgr: np.ndarray) -> np.ndarray:
+        """
+        Generate embedding from BGR image array (OpenCV format).
+        
+        Args:
+            img_bgr: BGR image array (H x W x 3)
+            
+        Returns:
+            512-dimensional embedding vector
+        """
+        # Convert OpenCV BGR -> RGB PIL image
+        img = Image.fromarray(img_bgr[:, :, ::-1])
+        
+        # Preprocess
+        img_tensor = self.preprocess(img).unsqueeze(0).to(self.device)
+        
+        # Encode
+        with torch.no_grad():
+            embedding = self.model.encode_image(img_tensor)
+            embedding = embedding / embedding.norm(dim=-1, keepdim=True)
+        
+        return embedding.cpu().numpy()[0]
+    
     def encode_image(self, image_path: str) -> np.ndarray:
         """
         Generate embedding for a single image.

@@ -8,7 +8,8 @@ Hệ thống phát hiện và phân loại món ăn sử dụng YOLOE và Mobile
 **✨ Tính năng:**
 - 🎯 **Smart Detection**: Ensemble filtering (spatial, size, ML) loại bỏ background & duplicates
 - 🔍 **High Accuracy**: MobileCLIP 512-dim embeddings với cosine similarity
-- ⚡ **Fast**: ~1s/image, hỗ trợ batch processing
+- ⚡ **Fast**: ~1s/image, hỗ trợ batch processing, cached embeddings (6800x faster startup)
+- 🗄️ **SQLite Database**: Cache embeddings & detection history tự động
 - 🌐 **REST API**: FastAPI integration cho microservices
 - 🎨 **Beautiful Viz**: Consistent colors cho từng class
 
@@ -79,20 +80,25 @@ print(result['detections'])
 ObjectDetection/
 ├── food_detection/                # 📦 Main package (modularized)
 │   ├── core/
-│   │   ├── detector.py           # YOLOE + ensemble filtering (758 lines)
+│   │   ├── detector.py           # YOLOE + ensemble filtering
 │   │   ├── embedder.py           # MobileCLIP embeddings
 │   │   ├── classifier.py         # Cosine similarity matching
 │   │   └── pipeline.py           # End-to-end pipeline
 │   ├── api/
 │   │   ├── app.py                # FastAPI application
 │   │   └── routes.py             # REST endpoints
-│   └── utils/
-│       ├── visualize.py          # Bounding box visualization
-│       └── image.py              # Image utilities
+│   ├── utils/
+│   │   ├── visualize.py          # Bounding box visualization
+│   │   └── image.py              # Image utilities
+│   └── database.py               # SQLite database manager
 │
 ├── main.py                        # CLI entry point
 ├── run_api.py                     # API server entry point
 ├── example_client.py              # Python API client example
+│
+├── tests/                         # Test suite
+│   ├── test_api.py               # API endpoint tests
+│   └── test_database.py          # Database integration tests
 │
 ├── models/                      
 │   ├── yoloe-11l-seg-pf.pt       # YOLOE detection model (~70.8MB)
@@ -106,6 +112,9 @@ ObjectDetection/
 │       ├── macaron/
 │       ├── meden/
 │       └── melon/
+│
+├── food_detection.db             # SQLite database (auto-created)
+│   └── Tables: reference_embeddings, detection_sessions, detected_objects
 │
 └── outputs/pipeline/             # Detection results
 ```
@@ -216,10 +225,16 @@ console.log(response.data);
 ```python
 from food_detection import FoodDetectionPipeline
 from food_detection.core import YOLOEFoodDetector, MobileCLIPEmbedder
+from food_detection.database import DatabaseManager
 
-# Full pipeline
-pipeline = FoodDetectionPipeline()
+# Full pipeline with database caching
+pipeline = FoodDetectionPipeline(use_cache=True)  # Load embeddings from DB
 result = pipeline.process_image("image.jpg", conf=0.5)
+
+# Query detection history
+db = DatabaseManager()
+recent_sessions = db.get_recent_sessions(limit=10)
+statistics = db.get_class_statistics()
 
 # Individual components
 detector = YOLOEFoodDetector("models/yoloe-11l-seg-pf.pt")
@@ -238,6 +253,10 @@ embedding = embedder.embed(image_array)
 ```
 Input Image
     ↓
+[0] Load Reference Embeddings
+    ├─ From SQLite DB (0.001s) ⚡ CACHED
+    └─ Or compute from ref_images (6.79s)
+    ↓
 [1] YOLOE Detection (1323ms)
     ↓
 [2] Ensemble Filtering
@@ -252,7 +271,9 @@ Input Image
     ↓
 [5] Classification (3ms, cosine similarity)
     ↓
-[6] Visualization (28ms)
+[6] Save to Database (detection history)
+    ↓
+[7] Visualization (28ms)
     ↓
 Output (labeled image + JSON)
 ```
@@ -316,6 +337,19 @@ pip install ultralytics --upgrade
 
 # Verify installation
 python -c "from ultralytics import YOLOE; from mobileclip import create_model_and_transforms; print('OK')"
+```
+
+**❌ Database issues:**
+```powershell
+# Clear cache and rebuild
+Remove-Item food_detection.db
+python tests/test_database.py  # Rebuild embeddings cache
+
+# Check database integrity
+python -c "from food_detection.database import DatabaseManager; db = DatabaseManager(); print(db.get_embeddings_count())"
+
+# Disable cache if needed
+# In code: pipeline = FoodDetectionPipeline(use_cache=False)
 ```
 
 **❌ API không start:**

@@ -1,0 +1,160 @@
+# ==============================================================================
+# Python
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ==============================================================================
+# Virtual Environments
+# ==============================================================================
+.venv/
+.venv11/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ==============================================================================
+# IDEs & Editors
+# ==============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# ==============================================================================
+# Jupyter Notebook
+# ==============================================================================
+.ipynb_checkpoints/
+*.ipynb
+
+# ==============================================================================
+# Models & Weights (Large Binary Files)
+# ==============================================================================
+# YOLOE model (70MB) - download separately
+models/yoloe-11l-seg-pf.pt
+
+# MobileCLIP model directory (380MB total) - download from Hugging Face
+models/mobileclip_s2/
+
+# YOLO11 trained models
+models/*.onnx
+models/*.pt
+
+# Keep model documentation
+!models/DOWNLOAD_MODELS.md
+!models/.gitkeep
+
+# Pretrained weights directory
+weights/
+!weights/.gitkeep
+
+# ==============================================================================
+# Dataset & Reference Images
+# ==============================================================================
+# Training images (25 images, ~30MB total)
+data/images/*.jpg
+data/images/*.png
+data/images/*.jpeg
+
+# YOLO labels
+data/labels/*.txt
+
+# Reference images (30 images across 5 classes)
+data/ref_images/**/*.jpg
+data/ref_images/**/*.png
+data/ref_images/**/*.jpeg
+
+# YOLO dataset splits
+data/yolov11_dataset/
+
+# Keep directory structure and documentation
+!data/images/.gitkeep
+!data/labels/.gitkeep
+!data/ref_images/.gitkeep
+!data/DATA_STRUCTURE.md
+
+# ==============================================================================
+# Embedding Database
+# ==============================================================================
+db/vectors.npy
+db/labels.txt
+!db/.gitkeep
+
+# ==============================================================================
+# Outputs & Results
+# ==============================================================================
+outputs/**/*.jpg
+outputs/**/*.png
+!outputs/.gitkeep
+!outputs/pipeline/.gitkeep
+
+# ==============================================================================
+# Training & Logs
+# ==============================================================================
+runs/
+logs/
+*.log
+wandb/
+checkpoints/
+
+# ==============================================================================
+# System Files
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ==============================================================================
+# Temporary Files
+# ==============================================================================
+*.tmp
+*.bak
+*.swp
+*~.nib
+*.cache
+
+# ==============================================================================
+# Archives & Large Files
+# ==============================================================================
+*.zip
+*.tar.gz
+*.tar
+*.rar
+*.7z
+*.iso
+
+# ==============================================================================
+# Git LFS (for large files tracking)
+# ==============================================================================
+# Use Git LFS for models if needed:
+# git lfs track "*.pt"
+# git lfs track "*.onnx"
+
+# ==============================================================================
+# Keep Essential Files
+# ==============================================================================
+!.gitkeep
+!README.md
+!requirements.txt
+!LICENSE
+!.gitattributes

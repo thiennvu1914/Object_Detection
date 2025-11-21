@@ -1,0 +1,66 @@
+# ==============================================================================
+# Food Detection & Classification Pipeline
+# ==============================================================================
+# Python: 3.11.8 (recommended)
+# Setup: pip install -r requirements.txt
+
+# ==============================================================================
+# Core Dependencies
+# ==============================================================================
+
+# Deep Learning Framework
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Computer Vision
+opencv-python>=4.8.0
+pillow>=10.0.0
+
+# YOLO Object Detection
+ultralytics>=8.0.0
+
+# Numerical Computing
+numpy>=1.24.0
+scikit-learn>=1.3.0
+
+# Visualization
+matplotlib>=3.7.0
+
+# ==============================================================================
+# Model-Specific Dependencies
+# ==============================================================================
+
+# MobileCLIP (install from source)
+# Run: pip install git+https://github.com/apple/ml-mobileclip.git
+mobileclip @ git+https://github.com/apple/ml-mobileclip.git
+
+# OpenCLIP (required by MobileCLIP)
+open-clip-torch>=2.20.0
+
+# ==============================================================================
+# Optional Dependencies
+# ==============================================================================
+
+# For training visualization
+# tensorboard>=2.13.0
+
+# For data augmentation
+# albumentations>=1.3.0
+
+# ==============================================================================
+# Installation Instructions
+# ==============================================================================
+# 
+# 1. Create virtual environment:
+#    python -m venv .venv11
+#    .\.venv11\Scripts\Activate.ps1  (Windows)
+#    source .venv11/bin/activate      (Linux/Mac)
+#
+# 2. Install dependencies:
+#    pip install -r requirements.txt
+#
+# 3. Download models (not included in repo due to size):
+#    - YOLOE model (70MB): Place in models/yoloe-11l-seg-pf.pt
+#    - MobileCLIP model (380MB): Place in models/mobileclip_s2/mobileclip_s2.pt
+#
+# ==============================================================================

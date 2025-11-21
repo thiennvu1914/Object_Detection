@@ -75,6 +75,14 @@ async def detect_food(
         # Extract class names
         classes = [det['class'] for det in results['detections']]
         
+        # Save detection history to database
+        if len(results['detections']) > 0:
+            session_id = pipeline.db.save_detection_session(
+                image_filename=file.filename,
+                detections=results['detections']
+            )
+            print(f"[API] Saved detection history (session_id={session_id})")
+        
         # Log output
         if len(results['detections']) > 0:
             print(f"[API] OUTPUT: status=OK (detected {len(results['detections'])} items: {classes})")
@@ -178,6 +186,13 @@ async def detect_food_batch(
             # Process image
             result = pipeline.process_image(tmp_path, conf=confidence)
             classes = [det['class'] for det in result['detections']]
+            
+            # Save detection history to database
+            if len(result['detections']) > 0:
+                pipeline.db.save_detection_session(
+                    image_filename=file.filename,
+                    detections=result['detections']
+                )
             
             results.append({
                 "filename": file.filename,

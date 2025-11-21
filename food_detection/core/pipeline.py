@@ -12,6 +12,7 @@ from typing import Dict, List, Tuple, Optional
 from .detector import YOLOEFoodDetector
 from .embedder import MobileCLIPEmbedder
 from .classifier import FoodClassifier
+from ..database import DatabaseManager
 
 
 class FoodDetectionPipeline:
@@ -21,7 +22,9 @@ class FoodDetectionPipeline:
         self,
         yoloe_model: str = "models/yoloe-11l-seg-pf.pt",
         mobileclip_model: str = "models/mobileclip_s2",
-        ref_images_dir: str = "data/ref_images"
+        ref_images_dir: str = "data/ref_images",
+        db_path: str = "food_detection.db",
+        use_cache: bool = True
     ):
         """
         Initialize pipeline with models.
@@ -30,21 +33,44 @@ class FoodDetectionPipeline:
             yoloe_model: Path to YOLOE model
             mobileclip_model: Path to MobileCLIP model directory
             ref_images_dir: Path to reference images directory
+            db_path: Path to SQLite database
+            use_cache: If True, load embeddings from database cache
         """
         self.detector = YOLOEFoodDetector(yoloe_model)
         self.embedder = MobileCLIPEmbedder(mobileclip_model)
         self.ref_images_dir = Path(ref_images_dir)
+        self.db = DatabaseManager(db_path)
+        self.use_cache = use_cache
         
-        # Load reference embeddings
+        # Load reference embeddings (from cache or compute)
         self.reference_embeddings = self._load_reference_embeddings()
         self.classifier = FoodClassifier(self.reference_embeddings)
     
     def _load_reference_embeddings(self) -> Dict[str, np.ndarray]:
-        """Load and generate embeddings for reference images"""
-        ref_embeddings = {}
+        """
+        Load reference embeddings from database cache or compute from images.
         
+        Returns:
+            Dictionary mapping class_name to embeddings array
+        """
+        # Try to load from database cache
+        if self.use_cache:
+            print("Loading reference embeddings from database cache...")
+            cached_embeddings = self.db.load_reference_embeddings()
+            
+            if cached_embeddings:
+                counts = self.db.get_embeddings_count()
+                print(f"✓ Loaded cached embeddings: {counts}")
+                return cached_embeddings
+            else:
+                print("  No cached embeddings found, computing from images...")
+        
+        # Compute embeddings from reference images
         if not self.ref_images_dir.exists():
             raise FileNotFoundError(f"Reference images directory not found: {self.ref_images_dir}")
+        
+        print(f"Computing embeddings from {self.ref_images_dir}...")
+        ref_embeddings = {}
         
         for class_dir in self.ref_images_dir.iterdir():
             if not class_dir.is_dir() or class_dir.name.startswith('.'):
@@ -57,8 +83,17 @@ class FoodDetectionPipeline:
                 continue
             
             # Generate embeddings for all reference images
+            print(f"  - {class_name}: {len(image_files)} images")
             embeddings = self.embedder.encode_images_batch([str(f) for f in image_files])
             ref_embeddings[class_name] = embeddings
+            
+            # Cache to database
+            if self.use_cache:
+                for img_path, embedding in zip(image_files, embeddings):
+                    self.db.save_reference_embeddings(class_name, str(img_path), embedding)
+        
+        if self.use_cache:
+            print(f"✓ Cached {sum(len(embs) for embs in ref_embeddings.values())} embeddings to database")
         
         return ref_embeddings
     

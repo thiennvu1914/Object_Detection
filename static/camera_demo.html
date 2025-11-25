@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Detection - Camera Stream</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #312e81 50%, #1e1b4b 100%);
+            min-height: 100vh;
+            padding: 15px;
+            animation: gradient 15s ease infinite;
+            background-size: 200% 200%;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+            color: white;
+            padding: 25px 35px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        .header h1 span {
+            font-size: 32px;
+            animation: bounce 2s ease-in-out infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.25);
+            border-radius: 25px;
+            font-size: 15px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: pulse-slow 2s infinite;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+        }
+        
+        .status-dot.connected {
+            background: #10b981;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.8);
+            animation: pulse-glow 1.5s infinite;
+        }
+        
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.9); }
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; box-shadow: 0 0 15px rgba(16, 185, 129, 0.8); }
+            50% { opacity: 0.8; box-shadow: 0 0 25px rgba(16, 185, 129, 1); }
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 2.2fr 1fr;
+            gap: 25px;
+            padding: 25px;
+        }
+        
+        .video-section {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            aspect-ratio: 4/3;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .video-section img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            font-size: 18px;
+        }
+        
+        .video-overlay.hidden {
+            display: none;
+        }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .card {
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+            border-radius: 14px;
+            padding: 22px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        }
+        
+        .card h2 {
+            font-size: 19px;
+            margin-bottom: 18px;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 12px;
+        }
+        
+        .card h2::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 2px;
+        }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        button.primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        button.primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+        
+        button.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(59, 130, 246, 0.4);
+        }
+        
+        button.primary:hover::before {
+            left: 100%;
+        }
+        
+        button.primary:active {
+            transform: translateY(0);
+        }
+        
+        button.secondary {
+            background: linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 100%);
+            color: #475569;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        
+        button.secondary:hover {
+            background: linear-gradient(135deg, #cbd5e1 0%, #e2e8f0 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+        
+        button:disabled::before {
+            display: none;
+        }
+        
+        .detections-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .detection-item {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+            border-image: linear-gradient(135deg, #3b82f6, #8b5cf6) 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .detection-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+        }
+        
+        .detection-item .name {
+            font-weight: 700;
+            color: #0f172a;
+            font-size: 15px;
+        }
+        
+        .detection-item .score {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 4px;
+        }
+        
+        .stat-item {
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+            padding: 16px 14px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .stat-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.15);
+            border-color: #3b82f6;
+        }
+        
+        .stat-item:hover::before {
+            opacity: 1;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .log {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            padding: 18px;
+            border-radius: 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #334155;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .log::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .log::-webkit-scrollbar-track {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        
+        .log::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 4px;
+        }
+        
+        .log::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+        }
+        
+        .log-entry {
+            margin-bottom: 6px;
+            padding: 4px 6px;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.08);
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .log-entry:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .log-time {
+            color: #94a3b8;
+            margin-right: 10px;
+            font-weight: 600;
+        }
+        
+        .log-message {
+            color: #e2e8f0;
+            line-height: 1.5;
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .log-error {
+            color: #f87171;
+            font-weight: 600;
+        }
+        
+        .log-success {
+            color: #34d399;
+            font-weight: 600;
+        }
+        
+        .log-warning {
+            color: #fbbf24;
+            font-weight: 600;
+        }
+        
+        @media (max-width: 1024px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                grid-row: 2;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .header {
+                padding: 18px;
+            }
+            
+            .header h1 {
+                font-size: 22px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .card {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span>🍎</span>
+                Real-Time Food Detection
+            </h1>
+            <div class="status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="video-section">
+                <!-- Preview layer (continuous stream) -->
+                <img id="previewFeed" src="" alt="Camera Preview" style="position: absolute; width: 100%; height: 100%; object-fit: contain; opacity: 0.7;">
+                <!-- Detection result layer (overlays on top when available) -->
+                <img id="detectionFeed" src="" alt="Detection Result" style="position: absolute; width: 100%; height: 100%; object-fit: contain; display: none;">
+                <div class="video-overlay" id="videoOverlay">
+                    <span>Click "Start Stream" to begin</span>
+                </div>
+            </div>
+            
+            <div class="sidebar">
+                <div class="card">
+                    <h2>⚙️ Controls</h2>
+                    <div style="margin-bottom: 15px;">
+                        <label for="intervalSelect" style="font-size: 14px; color: #475569; display: block; margin-bottom: 8px; font-weight: 600;">
+                            Detection Interval:
+                        </label>
+                        <select id="intervalSelect" style="width: 100%; padding: 10px 12px; border-radius: 8px; border: 2px solid #e2e8f0; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);">
+                            <option value="30">1 second</option>
+                            <option value="60">2 seconds</option>
+                            <option value="90">3 seconds</option>
+                            <option value="150" selected>5 seconds</option>
+                            <option value="300">10 seconds</option>
+                            <option value="450">15 seconds</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label for="confSlider" style="font-size: 14px; color: #475569; display: block; margin-bottom: 8px; font-weight: 600;">
+                            Detection Sensitivity: <span id="confValue" style="color: #3b82f6;">25%</span>
+                        </label>
+                        <input type="range" id="confSlider" min="1" max="100" value="25" style="width: 100%; cursor: pointer; accent-color: #3b82f6;">
+                        <div style="font-size: 11px; color: #94a3b8; margin-top: 5px;">
+                            Lower = detect more objects (may include noise)<br>
+                            Higher = strict detection (fewer objects)
+                        </div>
+                    </div>
+                    
+                    <div class="controls">
+                        <button class="primary" id="startBtn" onclick="startStream()">
+                            ▶️ Start Stream
+                        </button>
+                        <button class="secondary" id="stopBtn" onclick="stopStream()" disabled>
+                            ⏹️ Stop Stream
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>🎯 Detections</h2>
+                    <div id="detectionCount" style="font-size: 14px; color: #64748b; margin-bottom: 10px;">
+                        No detections yet
+                    </div>
+                    <div class="detections-list" id="detectionsList">
+                        <div style="text-align: center; color: #94a3b8; padding: 20px;">
+                            Waiting for detections...
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>📊 Statistics</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value" id="fpsValue">0</div>
+                            <div class="stat-label">FPS</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="totalDetections">0</div>
+                            <div class="stat-label">Total Items</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="processTime">0ms</div>
+                            <div class="stat-label">Process Time</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="frameCount">0</div>
+                            <div class="stat-label">Frames</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>📝 Event Log</h2>
+                    <div class="log" id="eventLog">
+                        <div class="log-entry">
+                            <span class="log-time">00:00:00</span>
+                            <span class="log-message">System ready</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        let isConnected = false;
+        let totalDetections = 0;
+        let frameCount = 0;
+        
+        function addLog(message, isError = false) {
+            const log = document.getElementById('eventLog');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="${isError ? 'log-error' : 'log-message'}">${message}</span>
+            `;
+            log.insertBefore(entry, log.firstChild);
+            
+            // Keep only last 20 entries
+            while (log.children.length > 20) {
+                log.removeChild(log.lastChild);
+            }
+        }
+        
+        function updateStatus(connected) {
+            isConnected = connected;
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+        
+        function startStream() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addLog('Stream already running', false);
+                return;
+            }
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.hostname;
+            const port = window.location.port || '8000';
+            const skipFrames = document.getElementById('intervalSelect').value;
+            const conf = document.getElementById('confSlider').value / 100;
+            const wsUrl = `${protocol}//${host}:${port}/api/v1/stream/camera?camera_id=0&skip_frames=${skipFrames}&conf=${conf}`;
+            
+            addLog(`Connecting to ${wsUrl}... (interval: ${skipFrames}, conf: ${conf})`);
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                updateStatus(true);
+                addLog('✓ Connected - Camera preview starting...');
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('videoOverlay').classList.add('hidden');
+            };
+            
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                handleMessage(message);
+            };
+            
+            ws.onerror = (error) => {
+                addLog('WebSocket error', true);
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = () => {
+                updateStatus(false);
+                addLog('✗ Disconnected');
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('videoOverlay').classList.remove('hidden');
+                // Clear feeds
+                document.getElementById('previewFeed').src = '';
+                document.getElementById('detectionFeed').src = '';
+                document.getElementById('detectionFeed').style.display = 'none';
+            };
+        }
+        
+        function stopStream() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function handleMessage(message) {
+            const type = message.type;
+            
+            if (type === 'preview') {
+                // Update preview feed (continuous stream)
+                const previewImg = document.getElementById('previewFeed');
+                previewImg.src = 'data:image/jpeg;base64,' + message.data;
+            }
+            else if (type === 'detection') {
+                // Update detection feed (high quality result)
+                const detectionImg = document.getElementById('detectionFeed');
+                detectionImg.src = 'data:image/jpeg;base64,' + message.data;
+                detectionImg.style.display = 'block';
+                
+                // Update detections list
+                updateDetections(message.detections);
+                
+                // Update stats
+                frameCount++;
+                totalDetections += message.count;
+                document.getElementById('processTime').textContent = 
+                    Math.round(message.processing_time * 1000) + 'ms';
+                document.getElementById('frameCount').textContent = frameCount;
+                document.getElementById('totalDetections').textContent = totalDetections;
+                
+                if (message.count > 0) {
+                    addLog(`✓ Detected ${message.count} items`);
+                } else {
+                    addLog('No items detected');
+                }
+                
+                // Fade out detection result after 4 seconds to show preview again
+                setTimeout(() => {
+                    detectionImg.style.opacity = '1';
+                    setTimeout(() => {
+                        detectionImg.style.transition = 'opacity 1s';
+                        detectionImg.style.opacity = '0';
+                        setTimeout(() => {
+                            detectionImg.style.display = 'none';
+                            detectionImg.style.transition = '';
+                            detectionImg.style.opacity = '1';
+                        }, 1000);
+                    }, 3000);
+                }, 100);
+            }
+            else if (type === 'text') {
+                addLog(message.data);
+            }
+            else if (type === 'error') {
+                addLog(message.data, true);
+            }
+            else if (type === 'stats') {
+                const camera = message.data.camera;
+                if (camera && camera.actual_fps) {
+                    document.getElementById('fpsValue').textContent = camera.actual_fps;
+                }
+            }
+        }
+        
+        function updateDetections(detections) {
+            const list = document.getElementById('detectionsList');
+            const count = document.getElementById('detectionCount');
+            
+            if (!detections || detections.length === 0) {
+                list.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 20px;">No detections in frame</div>';
+                count.textContent = 'No detections in current frame';
+                return;
+            }
+            
+            count.textContent = `${detections.length} item${detections.length > 1 ? 's' : ''} detected`;
+            
+            list.innerHTML = detections.map(det => {
+                // Use similarity or confidence as score
+                const score = det.similarity || det.confidence || det.score || 0;
+                return `
+                    <div class="detection-item">
+                        <span class="name">${det.class}</span>
+                        <span class="score">${(score * 100).toFixed(1)}%</span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Update confidence value display
+        document.getElementById('confSlider').addEventListener('input', function(e) {
+            document.getElementById('confValue').textContent = e.target.value + '%';
+        });
+        
+        // Auto-connect on page load (optional)
+        // window.onload = () => startStream();
+    </script>
+</body>
+</html>

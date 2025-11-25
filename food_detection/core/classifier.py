@@ -21,17 +21,19 @@ class FoodClassifier:
         self.reference_embeddings = reference_embeddings
         self.classes = list(reference_embeddings.keys())
     
-    def classify(self, embedding: np.ndarray) -> Tuple[str, float]:
+    def classify(self, embedding: np.ndarray, threshold: float = 0.15) -> Tuple[str, float]:
         """
         Classify a single embedding.
         
         Args:
             embedding: 512-dim embedding vector
+            threshold: Minimum similarity threshold (default: 0.15)
             
         Returns:
             Tuple of (predicted_class, similarity_score)
+            Returns ('unknown', score) if score < threshold
         """
-        best_class = None
+        best_class = "unknown"
         best_similarity = -1.0
         
         for class_name, ref_embeddings in self.reference_embeddings.items():
@@ -43,21 +45,25 @@ class FoodClassifier:
                 best_similarity = avg_similarity
                 best_class = class_name
         
+        if best_similarity < threshold:
+            return "unknown", float(best_similarity)
+            
         return best_class, float(best_similarity)
     
-    def classify_batch(self, embeddings: np.ndarray) -> List[Tuple[str, float]]:
+    def classify_batch(self, embeddings: np.ndarray, threshold: float = 0.15) -> List[Tuple[str, float]]:
         """
         Classify multiple embeddings.
         
         Args:
             embeddings: Array of embeddings (N x 512)
+            threshold: Minimum similarity threshold
             
         Returns:
             List of (predicted_class, similarity_score) tuples
         """
         results = []
         for embedding in embeddings:
-            result = self.classify(embedding)
+            result = self.classify(embedding, threshold=threshold)
             results.append(result)
         return results
     

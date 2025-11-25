@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Data Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background: #ef4444;
+        }
+        
+        .status-dot.connected {
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .main-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .preview-box {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            aspect-ratio: 4/3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .preview-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .empty-preview {
+            text-align: center;
+            color: #adb5bd;
+        }
+        
+        .empty-preview svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        .image-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button.primary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        button.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(240, 147, 251, 0.4);
+        }
+        
+        button.secondary {
+            background: #e9ecef;
+            color: #495057;
+        }
+        
+        button.secondary:hover {
+            background: #dee2e6;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .settings label {
+            display: block;
+            font-size: 14px;
+            color: #495057;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .settings input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f5576c;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .gallery-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .gallery-item:hover {
+            transform: scale(1.05);
+        }
+        
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .gallery-item .info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px;
+            font-size: 10px;
+        }
+        
+        .log {
+            background: #212529;
+            color: #adb5bd;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+        }
+        
+        .log-time {
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📸 Training Data Collection</h1>
+            <div class="status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Disconnected</span>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="main-section">
+                <div class="preview-box" id="previewBox">
+                    <div class="empty-preview">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        <div>Waiting for capture...</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>📊 Captured Images</h2>
+                    <div class="gallery" id="gallery">
+                        <div style="grid-column: 1/-1; text-align: center; color: #adb5bd; padding: 40px;">
+                            No images captured yet
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar">
+                <div class="card">
+                    <h2>⚙️ Settings</h2>
+                    <div class="settings">
+                        <label>Camera ID</label>
+                        <input type="number" id="cameraId" value="0" min="0">
+                        
+                        <label>Capture Interval (seconds)</label>
+                        <input type="number" id="interval" value="5" min="1" max="30">
+                    </div>
+                    <div class="controls">
+                        <button class="primary" id="startBtn" onclick="startStream()">▶️ Start Capture</button>
+                        <button class="secondary" id="stopBtn" onclick="stopStream()" disabled>⏹️ Stop Capture</button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>📈 Statistics</h2>
+                    <div class="stats">
+                        <div class="stat-item">
+                            <div class="stat-value" id="captureCount">0</div>
+                            <div class="stat-label">Captured</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="sessionTime">00:00</div>
+                            <div class="stat-label">Session Time</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>📝 Event Log</h2>
+                    <div class="log" id="log">
+                        <div class="log-entry">
+                            <span class="log-time">[00:00:00]</span> System ready
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        let capturedImages = [];
+        let sessionStartTime = null;
+        let timerInterval = null;
+        
+        function addLog(message) {
+            const log = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+            log.insertBefore(entry, log.firstChild);
+            
+            while (log.children.length > 50) {
+                log.removeChild(log.lastChild);
+            }
+        }
+        
+        function updateStatus(connected) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+        
+        function updatePreview(imageData, imageId, timestamp) {
+            const previewBox = document.getElementById('previewBox');
+            previewBox.innerHTML = `
+                <img src="data:image/jpeg;base64,${imageData}" alt="Captured">
+                <div class="image-info">
+                    ID: ${imageId}<br>
+                    ${timestamp}
+                </div>
+            `;
+        }
+        
+        function addToGallery(imageData, imageId, timestamp) {
+            capturedImages.push({ imageData, imageId, timestamp });
+            
+            const gallery = document.getElementById('gallery');
+            
+            if (capturedImages.length === 1) {
+                gallery.innerHTML = '';
+            }
+            
+            const item = document.createElement('div');
+            item.className = 'gallery-item';
+            item.innerHTML = `
+                <img src="data:image/jpeg;base64,${imageData}" alt="${imageId}">
+                <div class="info">${imageId}</div>
+            `;
+            
+            item.onclick = () => {
+                updatePreview(imageData, imageId, timestamp);
+            };
+            
+            gallery.insertBefore(item, gallery.firstChild);
+            
+            // Update count
+            document.getElementById('captureCount').textContent = capturedImages.length;
+        }
+        
+        function updateTimer() {
+            if (!sessionStartTime) return;
+            
+            const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            document.getElementById('sessionTime').textContent = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+        
+        function startStream() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addLog('Stream already running');
+                return;
+            }
+            
+            const cameraId = document.getElementById('cameraId').value;
+            const interval = document.getElementById('interval').value;
+            
+            const wsUrl = `ws://localhost:8000/api/v1/training/stream?camera_id=${cameraId}&interval=${interval}`;
+            
+            addLog(`Connecting to ${wsUrl}...`);
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                updateStatus(true);
+                addLog('✓ Connected to training stream');
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                
+                sessionStartTime = Date.now();
+                timerInterval = setInterval(updateTimer, 1000);
+            };
+            
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                
+                if (message.type === 'training_image') {
+                    updatePreview(message.image, message.image_id, message.timestamp);
+                    addToGallery(message.image, message.image_id, message.timestamp);
+                    addLog(`📸 Captured image #${message.capture_count}: ${message.image_id}`);
+                } else if (message.type === 'text') {
+                    addLog(message.data);
+                } else if (message.type === 'error') {
+                    addLog(`❌ ${message.data}`);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                addLog('❌ WebSocket error');
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = () => {
+                updateStatus(false);
+                addLog('✗ Disconnected');
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+            };
+        }
+        
+        function stopStream() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -9,7 +9,7 @@ Smart filtering for food detection with ensemble methods.
 3. ML CLASSIFIER - Score based on features
 4. ENSEMBLE - Voting from 3 methods (RECOMMENDED)
 """
-from ultralytics import YOLOE
+from ultralytics import YOLO
 import cv2
 import numpy as np
 from pathlib import Path
@@ -22,7 +22,7 @@ class YOLOEFoodDetector:
     
     def __init__(self, model_path="models/yoloe-11l-seg-pf.pt"):
         print("Loading YOLOE model...")
-        self.model = YOLOE(model_path)
+        self.model = YOLO(model_path)
         print("✓ Model loaded")
     
     def detect(self, image_path, conf=0.5, filter_method="ensemble"):
@@ -117,7 +117,10 @@ class YOLOEFoodDetector:
             'cigar box', 'box', 'container', 'tray', 'plaque',
             'bottle cap', 'lid', 'plate', 'saucer', 'linen',
             'napkin', 'cloth', 'towel', 'mat', 'tablecloth',
-            'close-up', 'beige', 'background', 'surface', 'texture'
+            'close-up', 'beige', 'background', 'surface', 'texture',
+            'clock', 'watch', 'wrist watch', 'wall clock',
+            'person', 'man', 'woman', 'face', 'hand', 'foot',
+            'phone', 'cell phone', 'mobile phone', 'laptop', 'mouse', 'keyboard'
         }
         
         filtered = []
@@ -252,14 +255,15 @@ class YOLOEFoodDetector:
                 continue
 
             # Check confidence (more lenient)
-            if conf < 0.5 * median_conf:
-                removed_outliers.append(f"{cls_name} (low conf={conf:.2f})")
-                continue
+            # if conf < 0.5 * median_conf:
+            #     removed_outliers.append(f"{cls_name} (low conf={conf:.2f})")
+            #     continue
             
             # Check size outlier (more lenient range)
-            if not (0.2 * median_area <= area <= 4.0 * median_area):
-                removed_outliers.append(f"{cls_name} (outlier size={area:.0f})")
-                continue
+            if not (0.1 * median_area <= area <= 10.0 * median_area):
+                # removed_outliers.append(f"{cls_name} (outlier size={area:.0f})")
+                # continue
+                pass
 
             final.append(b)
         
@@ -267,10 +271,10 @@ class YOLOEFoodDetector:
             print(f"  → Removed outliers: {', '.join(removed_outliers)}")
 
         return final
-    def remove_too_large_boxes(self, boxes, threshold=0.7):
+    def remove_too_large_boxes(self, boxes, threshold=0.95):
         """
         Loại bỏ boxes quá lớn (có thể là background/toàn bộ ảnh)
-        threshold: Box chiếm >70% ảnh sẽ bị loại
+        threshold: Box chiếm >95% ảnh sẽ bị loại
         """
         if len(boxes) == 0:
             return boxes
@@ -303,12 +307,44 @@ class YOLOEFoodDetector:
         
         return final
     
+    def apply_nms(self, boxes, iou_threshold=0.5):
+        """
+        Apply Non-Maximum Suppression to remove overlapping boxes.
+        """
+        if len(boxes) == 0:
+            return []
+            
+        # Sort boxes by confidence (descending)
+        sorted_boxes = sorted(boxes, key=lambda x: x.conf[0].item(), reverse=True)
+        
+        keep_boxes = []
+        
+        while len(sorted_boxes) > 0:
+            current = sorted_boxes.pop(0)
+            keep_boxes.append(current)
+            
+            curr_box = current.xyxy[0].cpu().numpy()
+            
+            # Compare with remaining boxes
+            remaining = []
+            for other in sorted_boxes:
+                other_box = other.xyxy[0].cpu().numpy()
+                iou = self.calculate_iou(curr_box, other_box)
+                
+                # If IoU is high, it's a duplicate -> remove it
+                if iou < iou_threshold:
+                    remaining.append(other)
+            
+            sorted_boxes = remaining
+            
+        return keep_boxes
+
     def post_process(self, boxes):
         """
         Pipeline xử lý 4 bước:
         0. Loại bỏ boxes quá lớn (có thể là toàn bộ ảnh)
         1. Xóa background (khay/bàn lớn) - CHỈ CHẠY 1 LẦN
-        2. Xóa parts (khung nhỏ nằm trong object)
+        2. Xóa duplicates (NMS)
         3. Xóa outliers (conf thấp, size bất thường)
         """
         initial_count = len(boxes)
@@ -316,13 +352,13 @@ class YOLOEFoodDetector:
         print(f"\n  Post-processing: {initial_count} boxes")
         
         # Step 0: Remove too-large boxes first
-        boxes = self.remove_too_large_boxes(boxes, threshold=0.7)
+        boxes = self.remove_too_large_boxes(boxes, threshold=0.95)
         
         # Step 1: Remove container CHỈ 1 LẦN
         boxes = self.remove_container(boxes)
         
-        # Step 2: Remove inner boxes (duplicates)
-        boxes = self.remove_inner(boxes)
+        # Step 2: Apply NMS to remove duplicates
+        boxes = self.apply_nms(boxes, iou_threshold=0.5)
         
         # Step 3: Remove outliers
         boxes = self.normalize_conf_area(boxes)

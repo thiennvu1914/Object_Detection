@@ -5,7 +5,12 @@ REST API for food detection and classification.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from .routes import router
+from .streaming import router as streaming_router
+from .predict_stream import router as predict_router
+from .training_stream import router as training_router
 
 
 # Create FastAPI app
@@ -26,8 +31,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files (for HTML demo)
+static_path = Path(__file__).parent.parent.parent / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+
 # Include routes
 app.include_router(router)
+app.include_router(streaming_router)
+app.include_router(predict_router)
+app.include_router(training_router)
 
 
 @app.get("/")

@@ -100,8 +100,10 @@ class FoodDetectionPipeline:
     def process_image(
         self,
         image_path: str,
-        conf: float = 0.5,
-        return_crops: bool = False
+        conf: float = 0.25,
+        filter_method: str = "ensemble",
+        return_crops: bool = False,
+        save_to_db: bool = True
     ) -> Dict:
         """
         Process a single image through the full pipeline.
@@ -109,7 +111,9 @@ class FoodDetectionPipeline:
         Args:
             image_path: Path to input image
             conf: Detection confidence threshold
+            filter_method: Filtering method ('ensemble', 'spatial', 'size', 'ml', 'none')
             return_crops: If True, include cropped images in results
+            save_to_db: If True, save results to database
             
         Returns:
             Dictionary containing detection results:
@@ -121,12 +125,17 @@ class FoodDetectionPipeline:
         start_time = time.time()
         
         # 1. Detect objects (returns list of dicts with ensemble filtering)
-        detections = self.detector.detect(image_path, conf=conf, filter_method="ensemble")
+        detections = self.detector.detect(image_path, conf=conf, filter_method=filter_method)
         
         # Read image for cropping
         image = cv2.imread(image_path)
         
         if len(detections) == 0:
+            # Save empty session if requested
+            if save_to_db:
+                filename = Path(image_path).name
+                self.db.save_detection_session(filename, [])
+                
             return {
                 'detections': [],
                 'image_shape': image.shape,
@@ -156,11 +165,17 @@ class FoodDetectionPipeline:
             embeddings.append(embedding)
         
         # 3. Classify using embeddings
-        classifications = self.classifier.classify_batch(np.array(embeddings))
+        # Use a higher threshold (0.55) to filter out non-food items like watches/phones
+        # Real food items usually have similarity > 0.8
+        classifications = self.classifier.classify_batch(np.array(embeddings), threshold=0.55)
         
         # 4. Update detections with classification results
         final_detections = []
         for i, (det, (class_name, similarity)) in enumerate(zip(detections, classifications)):
+            # Skip unknown items (low similarity)
+            if class_name == "unknown":
+                continue
+                
             final_detections.append({
                 'bbox': det['bbox'],
                 'class': class_name,
@@ -186,6 +201,15 @@ class FoodDetectionPipeline:
         
         if return_crops:
             result['crops'] = crops
+            
+        # Save to database
+        if save_to_db:
+            try:
+                filename = Path(image_path).name
+                self.db.save_detection_session(filename, final_detections)
+                print(f"✓ Saved results to database (session for {filename})")
+            except Exception as e:
+                print(f"⚠️ Failed to save to database: {e}")
         
         return result
     

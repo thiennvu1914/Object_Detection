@@ -70,7 +70,8 @@ async def detect_food(
     try:
         # Process image
         pipeline = get_pipeline()
-        results = pipeline.process_image(tmp_path, conf=confidence)
+        # Don't save to DB inside pipeline, we'll do it manually with correct filename
+        results = pipeline.process_image(tmp_path, conf=confidence, save_to_db=False)
         
         # Extract class names
         classes = [det['class'] for det in results['detections']]
@@ -184,7 +185,8 @@ async def detect_food_batch(
         
         try:
             # Process image
-            result = pipeline.process_image(tmp_path, conf=confidence)
+            # Don't save to DB inside pipeline, we'll do it manually with correct filename
+            result = pipeline.process_image(tmp_path, conf=confidence, save_to_db=False)
             classes = [det['class'] for det in result['detections']]
             
             # Save detection history to database

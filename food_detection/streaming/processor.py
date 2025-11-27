@@ -1,7 +1,13 @@
 """
 Frame Processor Module
 ======================
-Queue-based frame processing with detection and encoding.
+Queue-based frame processing with SSIM-based change detection optimization.
+
+Features:
+- Lightweight change detection layer (SSIM + Frame Difference)
+- Only triggers YOLOE when significant changes detected
+- Zero-training, menu-agnostic approach
+- Queue-based processing to avoid blocking
 """
 import cv2
 import numpy as np
@@ -10,6 +16,7 @@ from typing import Optional, Dict, Any
 from queue import Queue, Empty
 import threading
 import time
+from food_detection.streaming.change_detector import ChangeDetector
 
 
 class FrameProcessor:
@@ -26,26 +33,48 @@ class FrameProcessor:
     def __init__(
         self,
         pipeline,
-        skip_frames: int = 2,
-        max_queue_size: int = 2,
+        skip_frames: int = 15,
+        max_queue_size: int = 1,
         encode_quality: int = 70,
-        conf: float = 0.25
+        conf: float = 0.25,
+        enable_change_detection: bool = True,
+        change_detector: Optional[ChangeDetector] = None,
+        auto_flush_queue: bool = True
     ):
         """
         Initialize frame processor.
         
         Args:
             pipeline: FoodDetectionPipeline instance
-            skip_frames: Process every Nth frame (1 = process all, 2 = skip 1, etc.)
-            max_queue_size: Maximum frames in queue (keep small to avoid lag)
+            skip_frames: Process every Nth frame (15 = ~2 FPS detection at 30 FPS camera)
+                        Recommended: 10-20 for lag-free streaming
+            max_queue_size: Maximum frames in queue (1 = no backlog, minimal lag)
             encode_quality: JPEG encoding quality (1-100, lower=smaller file)
             conf: Detection confidence threshold (0.0-1.0)
+            enable_change_detection: Enable SSIM-based change detection layer
+            change_detector: Custom ChangeDetector instance (or create default)
+            auto_flush_queue: Automatically flush old frames to prevent backlog
         """
         self.pipeline = pipeline
         self.skip_frames = skip_frames
         self.max_queue_size = max_queue_size
         self.encode_quality = encode_quality
         self.conf = conf
+        self.auto_flush_queue = auto_flush_queue
+        
+        # Change detection layer (pre-filter before YOLOE)
+        self.enable_change_detection = enable_change_detection
+        if enable_change_detection:
+            self.change_detector = change_detector or ChangeDetector(
+                ssim_threshold=0.80,      # 20% change triggers detection (less sensitive)
+                diff_threshold=0.20,      # 20% pixels changed (less sensitive)
+                resize_width=320          # Fast preprocessing
+            )
+            print("[FrameProcessor] Change detection enabled (SSIM + Frame Diff)")
+            print(f"[FrameProcessor] Thresholds: SSIM={0.80}, Diff={0.20} (reduced sensitivity)")
+        else:
+            self.change_detector = None
+            print("[FrameProcessor] Change detection disabled")
         
         self.frame_queue = Queue(maxsize=max_queue_size)
         self.is_running = False
@@ -54,11 +83,18 @@ class FrameProcessor:
         # Statistics
         self.frames_processed = 0
         self.frames_skipped = 0
+        self.frames_skipped_by_change_detector = 0
+        self.frames_flushed = 0  # Frames flushed to prevent backlog
         self.frame_counter = 0
         
         # Latest result cache
         self.latest_result: Optional[Dict[str, Any]] = None
         self.result_lock = threading.Lock()
+        
+        # Performance optimization
+        detection_fps = 30.0 / skip_frames
+        print(f"[FrameProcessor] Skip frames: {skip_frames} (~{detection_fps:.1f} FPS detection)")
+        print(f"[FrameProcessor] Queue size: {max_queue_size} (auto_flush={auto_flush_queue})")
     
     def start(self):
         """Start processing thread."""
@@ -80,7 +116,7 @@ class FrameProcessor:
         if self.process_thread:
             self.process_thread.join(timeout=2.0)
         
-        print(f"[FrameProcessor] Stopped (processed={self.frames_processed}, skipped={self.frames_skipped})")
+        print(f"[FrameProcessor] Stopped (processed={self.frames_processed}, skipped={self.frames_skipped}, flushed={self.frames_flushed})")
     
     def submit_frame(self, frame: np.ndarray) -> bool:
         """
@@ -99,10 +135,20 @@ class FrameProcessor:
             self.frames_skipped += 1
             return False
         
-        # If queue is full, clear old frames to prevent lag
+        # Auto-flush queue to prevent backlog (keep only latest frame)
+        if self.auto_flush_queue:
+            while not self.frame_queue.empty():
+                try:
+                    self.frame_queue.get_nowait()  # Remove all old frames
+                    self.frames_flushed += 1
+                except:
+                    break
+        
+        # If queue still full, force remove oldest frame
         if self.frame_queue.full():
             try:
-                self.frame_queue.get_nowait()  # Remove oldest frame
+                self.frame_queue.get_nowait()
+                self.frames_flushed += 1
             except:
                 pass
         
@@ -124,6 +170,33 @@ class FrameProcessor:
                 continue
             
             try:
+                # ====== CHANGE DETECTION LAYER (Pre-filter) ======
+                # Only trigger YOLOE if significant change detected
+                should_detect = True
+                change_metrics = None
+                
+                if self.enable_change_detection and self.change_detector:
+                    should_detect, change_metrics = self.change_detector.detect_change(frame)
+                    
+                    if not should_detect:
+                        # No significant change → Skip YOLOE and MobileCLIP
+                        self.frames_skipped_by_change_detector += 1
+                        
+                        # Return cached result with change detection info
+                        with self.result_lock:
+                            if self.latest_result:
+                                # Reuse previous detection result
+                                cached_result = self.latest_result.copy()
+                                cached_result['cached'] = True
+                                cached_result['change_detection'] = change_metrics
+                                cached_result['timestamp'] = time.time()
+                                self.latest_result = cached_result
+                        
+                        continue  # Skip to next frame
+                
+                # ====== YOLOE + MobileCLIP PIPELINE ======
+                # Change detected → Run full detection pipeline
+                
                 # Save frame temporarily for detection
                 import tempfile
                 from pathlib import Path
@@ -132,9 +205,13 @@ class FrameProcessor:
                     cv2.imwrite(tmp.name, frame)
                     tmp_path = tmp.name
                 
-                # Run detection
+                # Run detection (MobileCLIP only runs if YOLOE detects objects)
                 start_time = time.time()
-                results = self.pipeline.process_image(tmp_path, conf=self.conf)
+                results = self.pipeline.process_image(
+                    tmp_path, 
+                    conf=self.conf,
+                    save_to_db=False  # Skip DB to reduce overhead
+                )
                 processing_time = time.time() - start_time
                 
                 # Clean up temp file
@@ -146,7 +223,7 @@ class FrameProcessor:
                 # Encode to base64
                 base64_image = self._encode_frame(annotated_frame)
                 
-                # Update latest result
+                # Update latest result (include change detection metrics)
                 with self.result_lock:
                     self.latest_result = {
                         'type': 'detection',
@@ -154,6 +231,8 @@ class FrameProcessor:
                         'detections': results['detections'],
                         'count': len(results['detections']),
                         'processing_time': round(processing_time, 3),
+                        'cached': False,
+                        'change_detection': change_metrics,
                         'timestamp': time.time()
                     }
                 
@@ -284,11 +363,40 @@ class FrameProcessor:
         Get processing statistics.
         
         Returns:
-            Dict with processing stats
+            Dict with processing stats including change detection efficiency
         """
-        return {
+        stats = {
             'frames_processed': self.frames_processed,
             'frames_skipped': self.frames_skipped,
+            'frames_skipped_by_change_detector': self.frames_skipped_by_change_detector,
+            'frames_flushed': self.frames_flushed,
             'queue_size': self.frame_queue.qsize(),
             'skip_ratio': self.skip_frames
         }
+        
+        # Add change detection statistics if enabled
+        if self.enable_change_detection and self.change_detector:
+            change_stats = self.change_detector.get_statistics()
+            stats['change_detection'] = change_stats
+            
+            # Calculate total optimization ratio (skip_frames + change detection)
+            total_frames_captured = self.frame_counter
+            yoloe_calls = self.frames_processed
+            
+            if total_frames_captured > 0:
+                # Frames that reached processor after skip_frames
+                frames_submitted = total_frames_captured // self.skip_frames
+                
+                # Combined optimization
+                skip_frames_reduction = 1.0 - (1.0 / self.skip_frames)
+                
+                if frames_submitted > 0:
+                    change_detection_reduction = self.frames_skipped_by_change_detector / frames_submitted
+                    total_reduction = skip_frames_reduction + (1.0 - skip_frames_reduction) * change_detection_reduction
+                else:
+                    total_reduction = skip_frames_reduction
+                
+                stats['optimization_ratio'] = f"{total_reduction*100:.1f}%"
+                stats['effective_fps'] = f"{(yoloe_calls / total_frames_captured * 30.0):.2f} FPS"
+        
+        return stats

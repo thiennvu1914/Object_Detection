@@ -134,9 +134,6 @@ class YOLOEFoodDetector:
             else:
                 filtered.append(b)
         
-        if removed:
-            print(f"  → Removed containers: {', '.join(set(removed))}")
-        
         return filtered
     
     def calculate_overlap_ratio(self, small_box, large_box):
@@ -208,9 +205,6 @@ class YOLOEFoodDetector:
                 if overlap_ratio >= overlap_threshold:
                     removed_parts.append(f"{info[j]['name']} (inside {info[i]['name']}, {overlap_ratio*100:.0f}%)")
                     info[j]['keep'] = False
-        
-        if removed_parts:
-            print(f"  → Removed inner boxes: {', '.join(removed_parts)}")
         
         return [x['box'] for x in info if x['keep']]
     def normalize_conf_area(self, boxes):
@@ -301,9 +295,6 @@ class YOLOEFoodDetector:
                 removed_large.append(f"{cls_name} (covers {100*ratio:.0f}% of image)")
             else:
                 final.append(b)
-        
-        if removed_large:
-            print(f"  → Removed too-large boxes: {', '.join(removed_large)}")
         
         return final
     
@@ -531,10 +522,6 @@ class YOLOEFoodDetector:
         size_boxes = self.size_filter_no_container(result)
         ml_boxes = self.ml_filter_no_container(result)
         
-        print(f"  - Spatial: {len(spatial_boxes)} items")
-        print(f"  - Size: {len(size_boxes)} items")
-        print(f"  - ML: {len(ml_boxes)} items")
-        
         # Convert to sets of indices (use array index instead of id)
         spatial_indices = set()
         for i, box in enumerate(boxes):
@@ -563,14 +550,10 @@ class YOLOEFoodDetector:
             if votes >= 1:
                 food_boxes.append(box)
         
-        print(f"  - After voting (>=1 vote): {len(food_boxes)} items")
-        
         # Final post-processing: Remove too-large, container, and inner boxes
         food_boxes = self.remove_too_large_boxes(food_boxes, threshold=0.7)
         food_boxes = self.remove_container(food_boxes)
         food_boxes = self.remove_inner(food_boxes)
-        
-        print(f"  Final result: {len(food_boxes)} food items\n")
         
         return food_boxes
     

@@ -38,13 +38,14 @@ def get_pipeline():
     return _pipeline
 
 
-async def start_streaming(camera_id: int = 0, skip_frames: int = 2, conf: float = 0.25):
+async def start_streaming(camera_id: int = 0, skip_frames: int = 15, conf: float = 0.25):
     """
     Start camera streaming and processing.
     
     Args:
         camera_id: Camera device ID
-        skip_frames: Process every Nth frame
+        skip_frames: Process every Nth frame (15 = ~2 FPS detection)
+                    Recommended: 10-20 for lag-free streaming
         conf: Detection confidence threshold
     """
     global _camera, _processor, _streaming_task
@@ -62,9 +63,16 @@ async def start_streaming(camera_id: int = 0, skip_frames: int = 2, conf: float 
     if not _camera.start():
         raise RuntimeError(f"Failed to open camera {camera_id}")
     
-    # Initialize processor
+    # Initialize processor with optimized settings for lag-free streaming
     pipeline = get_pipeline()
-    _processor = FrameProcessor(pipeline, skip_frames=skip_frames, conf=conf)
+    _processor = FrameProcessor(
+        pipeline, 
+        skip_frames=skip_frames,
+        max_queue_size=1,              # Keep queue size ≤ 1 (no backlog)
+        conf=conf,
+        enable_change_detection=True,  # Enable SSIM-based pre-filter
+        auto_flush_queue=True          # Auto-flush old frames
+    )
     _processor.start()
     
     # Start streaming loop

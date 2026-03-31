@@ -14,6 +14,10 @@ Real-time food detection với YOLOE, MobileCLIP, và SSIM-based Change Detectio
 - **🌐 REST API**: FastAPI + WebSocket dual-stream
 - **📹 Demo**: test_streaming_demo.py với ROI visualization
 
+## 🎬 Demo Video
+
+[Watch the demo](https://drive.google.com/drive/folders/1cSzTw8m8LVakwSYDJg0ILTHTlpNp12N2?usp=drive_link)
+
 ## 📦 Quick Start
 
 ```powershell
